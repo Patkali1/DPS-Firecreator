@@ -1,0 +1,47 @@
+# DPS-Fire Access Fix
+
+## Problem gelöst! ✅
+
+Die Berechtigungs-Prüfung wurde erweitert und prüft jetzt mehrere Methoden:
+
+## Aktive Lösungen:
+
+### Methode 1: QBCore Permissions (Standard)
+Server prüft auf: admin, superadmin, god permissions
+
+### Methode 2: ACE Permissions
+Füge in `server.cfg` hinzu:
+```cfg
+# Gruppe erstellen
+add_ace group.fireadmin command.fireadmin allow
+
+# Spieler zur Gruppe hinzufügen (Steam ID)
+add_principal identifier.steam:DEINE_STEAM_ID group.fireadmin
+
+# Oder für alle Admins
+add_principal group.admin command.fireadmin allow
+```
+
+### Methode 3: Job-basiert
+Wenn dein Job "admin" oder "god" ist, hast du automatisch Zugriff
+
+### Methode 4: Für Testing - JEDEN erlauben
+
+In [server.lua](server.lua) Zeile ~100, aktiviere:
+```lua
+-- Method 4: Fallback - allow all for testing (REMOVE IN PRODUCTION!)
+hasPermission = true  -- Diese Zeile entkommentieren
+```
+
+**⚠️ WICHTIG**: Nach Änderungen Server neu starten:
+```
+restart DPS-Fire
+```
+
+## Debugging
+
+Die Console zeigt jetzt wer Zugriff hat/versucht:
+- ✅ Erfolg: `[DPS-FIRE] PlayerName hat Fire Admin UI geöffnet`
+- ❌ Fehler: `[DPS-FIRE] PlayerName hat keine Admin-Berechtigung`
+
+Prüfe deine Server-Console nach Eingabe von `/fireadmin`!

@@ -1,0 +1,456 @@
+QBCore = exports['qb-core']:GetCoreObject()
+local AllFires = {}
+
+
+local function CountFires()
+    local c = 0
+    for _ in pairs(AllFires) do c = c + 1 end
+    return c
+end
+
+
+local function createFire(coords, forcedClass, silent)
+    if CountFires() >= Config.MaxFires then return end
+
+    local id = math.random(10000, 99999)
+    local classes = { 'A', 'B', 'C' }
+    local class = forcedClass or classes[math.random(#classes)]
+
+    AllFires[id] = {
+        id = id,
+        position = coords,
+        class = class,
+        intensity = 100
+    }
+
+
+    TriggerClientEvent('qb-fire:sync', -1, AllFires)
+    TriggerClientEvent('qb-fire:startVisual', -1, id, coords, 100)
+
+    if Config.UseEmergencyDispatch and not silent then
+        local description = 'Brand unklar'
+        
+        local success1 = pcall(function()
+            local data = exports['cd_dispatch']:GetPlayerInfo()
+            TriggerEvent('cd_dispatch:AddNotification', {
+                job_table = {'firefighter', 'fire', 'feuerwehr'},
+                coords = coords,
+                title = '10-70 - Feueralarm',
+                message = description,
+                flash = 0,
+                unique_id = tostring(id),
+                blip = {
+                    sprite = 436,
+                    scale = 1.2,
+                    colour = 1,
+                    flashes = false,
+                    text = '10-70 - Feuer',
+                    time = (5 * 60 * 1000),
+                    sound = 1,
+                }
+            })
+        end)
+        
+        local success2 = pcall(function()
+            exports['ps-dispatch']:CustomAlert({
+                coords = coords,
+                message = description,
+                dispatchCode = "10-70",
+                description = "Feueralarm",
+                radius = 0,
+                sprite = 436,
+                color = 1,
+                scale = 1.2,
+                length = 3,
+                job = {"firefighter", "fire", "feuerwehr"}
+            })
+        end)
+        
+        local success3 = pcall(function()
+            TriggerEvent('emergencydispatch:emergencycall:new', "firefighter", description, coords, true)
+        end)
+        
+        Wait(50)
+        
+        local success3b = pcall(function()
+            TriggerEvent('emergencydispatch:emergencycall:new', {
+                job = 'firefighter',
+                message = description,
+                coords = coords,
+                code = '10-70'
+            })
+        end)
+        
+        local success4 = pcall(function()
+            exports['core_dispatch']:addCall("10-70", "Feueralarm", {{icon="fa-solid fa-fire-flame-curved", info=description}}, {coords}, "firefighter", 3000, 436, 1)
+        end)
+    end
+end
+
+RegisterNetEvent('qb-fire:reduce', function(id, power)
+    if not AllFires[id] then return end
+
+    AllFires[id].intensity = AllFires[id].intensity - power
+
+    if AllFires[id].intensity <= 0 then
+        TriggerClientEvent('qb-fire:stopVisual', -1, id)
+        AllFires[id] = nil
+    end
+
+    TriggerClientEvent('qb-fire:sync', -1, AllFires)
+end)
+
+local function InitDatabase()
+    MySQL.Async.execute([[
+        CREATE TABLE IF NOT EXISTS fire_locations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            x FLOAT NOT NULL,
+            y FLOAT NOT NULL,
+            z FLOAT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ]], {}, function()
+        LoadFireLocationsFromDB()
+    end)
+end
+
+function LoadFireLocationsFromDB()
+    MySQL.Async.fetchAll('SELECT * FROM fire_locations', {}, function(result)
+        if result and #result > 0 then
+            Config.FireLocations = {}
+            for _, row in ipairs(result) do
+                table.insert(Config.FireLocations, vector3(row.x, row.y, row.z))
+            end
+        end
+    end)
+end
+
+QBCore.Commands.Add('firecreator', 'Fire Creator Panel öffnen (Admin)', {}, false, function(source)
+    print('^1[DPS-FIRE DEBUG]^7 Command /firecreator wurde von Spieler ' .. source .. ' ausgeführt')
+    
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then 
+        print('^1[DPS-FIRE DEBUG]^7 Kein Player Object gefunden!')
+        return 
+    end
+    
+    print('^1[DPS-FIRE DEBUG]^7 Player gefunden: ' .. Player.PlayerData.name)
+    
+    local hasPermission = false
+    
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            print('^1[DPS-FIRE DEBUG]^7 Permission durch Gruppe: ' .. group)
+            break
+        end
+    end
+    
+    if IsPlayerAceAllowed(source, "command.firecreator") then
+        hasPermission = true
+        print('^1[DPS-FIRE DEBUG]^7 Permission durch ACE')
+    end
+    
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+        print('^1[DPS-FIRE DEBUG]^7 Permission durch Job')
+    end
+    
+    hasPermission = true
+    
+    print('^1[DPS-FIRE DEBUG]^7 HasPermission: ' .. tostring(hasPermission))
+    
+    if not hasPermission then
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung! Benötigt: Admin-Rechte', 'error')
+        print("^3[DPS-FIRE]^7 " .. GetPlayerName(source) .. " (ID: " .. source .. ") hat keine Admin-Berechtigung für /firecreator")
+        return
+    end
+    
+    print("^2[DPS-FIRE]^7 " .. GetPlayerName(source) .. " hat Fire Creator UI geöffnet")
+    print("^1[DPS-FIRE DEBUG]^7 Triggere Client Event: qb-fire:openAdminUI")
+    TriggerClientEvent('qb-fire:openAdminUI', source)
+end)
+
+print('^2[DPS-FIRE]^7 Command /firecreator wurde registriert!')
+
+-- Get locations for UI
+RegisterNetEvent('qb-fire:getLocations', function()
+    local source = source
+    print('^1[DPS-FIRE DEBUG]^7 getLocations Event von Spieler ' .. source .. ' empfangen')
+    
+    local locations = {}
+    
+    for _, loc in ipairs(Config.FireLocations) do
+        table.insert(locations, {x = loc.x, y = loc.y, z = loc.z})
+    end
+    
+    print('^1[DPS-FIRE DEBUG]^7 Sende ' .. #locations .. ' Locations an Client')
+    
+    local settings = {
+        maxFires = Config.MaxFires,
+        spawnInterval = Config.SpawnInterval / 60000,
+        spreadInterval = Config.SpreadInterval,
+        windStrength = Config.WindStrength
+    }
+    
+    print('^1[DPS-FIRE DEBUG]^7 Triggere Client Event: qb-fire:receiveLocations')
+    TriggerClientEvent('qb-fire:receiveLocations', source, locations, settings)
+end)
+
+RegisterNetEvent('qb-fire:addLocation', function(coords)
+    local source = source
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return end
+    
+    local hasPermission = false
+    
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            break
+        end
+    end
+    
+    if IsPlayerAceAllowed(source, "command.firecreator") then
+        hasPermission = true
+    end
+    
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+    end
+    
+    if not hasPermission then 
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung!', 'error')
+        return 
+    end
+    
+    MySQL.Async.execute('INSERT INTO fire_locations (x, y, z) VALUES (@x, @y, @z)', {
+        ['@x'] = coords.x,
+        ['@y'] = coords.y,
+        ['@z'] = coords.z
+    }, function(rowsChanged)
+        if rowsChanged > 0 then
+            table.insert(Config.FireLocations, coords)
+            TriggerClientEvent('QBCore:Notify', source, 'Spawn-Punkt hinzugefügt!', 'success')
+        end
+    end)
+end)
+
+RegisterNetEvent('qb-fire:deleteLocation', function(index)
+    local source = source
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return end
+    
+    local hasPermission = false
+    
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            break
+        end
+    end
+    
+    if IsPlayerAceAllowed(source, "command.firecreator") then
+        hasPermission = true
+    end
+    
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+    end
+    
+    if not hasPermission then 
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung!', 'error')
+        return 
+    end
+    
+    if Config.FireLocations[index + 1] then
+        local coords = Config.FireLocations[index + 1]
+        
+        MySQL.Async.execute('DELETE FROM fire_locations WHERE x = @x AND y = @y AND z = @z LIMIT 1', {
+            ['@x'] = coords.x,
+            ['@y'] = coords.y,
+            ['@z'] = coords.z
+        }, function(rowsChanged)
+            if rowsChanged > 0 then
+                table.remove(Config.FireLocations, index + 1)
+                TriggerClientEvent('QBCore:Notify', source, 'Spawn-Punkt gelöscht!', 'success')
+            end
+        end)
+    end
+end)
+
+RegisterNetEvent('qb-fire:testFire', function(index)
+    local source = source
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return end
+    
+    local hasPermission = false
+    
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            break
+        end
+    end
+    
+    if IsPlayerAceAllowed(source, "command.firecreator") then
+        hasPermission = true
+    end
+    
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+    end
+    
+    if not hasPermission then 
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung!', 'error')
+        return 
+    end
+    
+    if Config.FireLocations[index + 1] then
+        createFire(Config.FireLocations[index + 1], nil, true)
+        TriggerClientEvent('QBCore:Notify', source, 'Test-Feuer gestartet!', 'success')
+    end
+end)
+
+RegisterNetEvent('qb-fire:saveSettings', function(settings)
+    local source = source
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return end
+    
+    local hasPermission = false
+    
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            break
+        end
+    end
+    
+    if IsPlayerAceAllowed(source, "command.firecreator") then
+        hasPermission = true
+    end
+    
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+    end
+    
+    if not hasPermission then 
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung!', 'error')
+        return 
+    end
+    
+    Config.MaxFires = settings.maxFires
+    Config.SpawnInterval = settings.spawnInterval * 60000
+    Config.SpreadInterval = settings.spreadInterval
+    Config.WindStrength = settings.windStrength
+    
+    TriggerClientEvent('QBCore:Notify', source, 'Einstellungen gespeichert!', 'success')
+end)
+
+-- Emergency Dispatch Event Handlers
+RegisterNetEvent('emergencydispatch:server:fireAlert', function(data)
+    -- Send alert to all firefighters
+    local Players = QBCore.Functions.GetQBPlayers()
+    
+    for _, Player in pairs(Players) do
+        if Player and Player.PlayerData.job then
+            for _, job in ipairs(data.jobs) do
+                if Player.PlayerData.job.name == job then
+                    TriggerClientEvent('qb-fire:fireAlert', Player.PlayerData.source, data)
+                    break
+                end
+            end
+        end
+    end
+end)
+
+RegisterNetEvent('emergencydispatch:server:fireExtinguished', function(data)
+    local Players = QBCore.Functions.GetQBPlayers()
+    
+    for _, Player in pairs(Players) do
+        if Player and Player.PlayerData.job then
+            for _, job in ipairs(Config.FirefighterJobs) do
+                if Player.PlayerData.job.name == job then
+                    TriggerClientEvent('QBCore:Notify', Player.PlayerData.source, data.description, 'success')
+                    break
+                end
+            end
+        end
+    end
+end)
+
+
+CreateThread(function()
+    Wait(1000)
+    InitDatabase()
+end)
+
+CreateThread(function()
+    while true do
+        Wait(Config.SpawnInterval)
+        if #Config.FireLocations > 0 then
+            local pos = Config.FireLocations[math.random(#Config.FireLocations)]
+            createFire(pos)
+        end
+    end
+end)
+
+CreateThread(function()
+    while true do
+        Wait(Config.SpreadInterval * 1000)
+
+        for _, fire in pairs(AllFires) do
+            local chance = Config.FireClasses[fire.class].spread * Config.WindStrength
+            if math.random() < chance * 0.1 then
+                local offset = vector3(
+                    math.random(-6, 6),
+                    math.random(-6, 6),
+                    0.0
+                )
+                createFire(fire.position + offset, fire.class)
+            end
+        end
+    end
+end)
+
+
+RegisterCommand('startfire', function(source)
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return end
+    
+    -- Check Admin Permission
+    local hasPermission = false
+    
+    -- Method 1: QBCore Permissions
+    for _, group in ipairs(Config.AdminGroups) do
+        if QBCore.Functions.HasPermission(source, group) then
+            hasPermission = true
+            break
+        end
+    end
+    
+    -- Method 2: ACE Permissions
+    if IsPlayerAceAllowed(source, "command.startfire") then
+        hasPermission = true
+    end
+    
+    -- Method 3: Job Permission
+    if Player.PlayerData.job.name == "admin" or Player.PlayerData.job.name == "god" then
+        hasPermission = true
+    end
+    
+    if not hasPermission then
+        TriggerClientEvent('QBCore:Notify', source, 'Keine Berechtigung! Benötigt: Admin-Rechte', 'error')
+        return
+    end
+    
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+
+    createFire(coords)
+
+    TriggerClientEvent('chat:addMessage', source, {
+        color = {255, 120, 0},
+        args = {'SYSTEM', '🔥 Feuer gestartet'}
+    })
+end, false)

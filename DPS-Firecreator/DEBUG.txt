@@ -1,0 +1,23 @@
+### DPS-FIRE DEBUG CHECKLIST
+
+Bitte prüfe folgendes:
+
+1. **Server Console** beim Start:
+   - Siehst du: "Started resource DPS-Fire" ?
+   - Gibt es FEHLER beim Laden?
+
+2. **Im Spiel - F8 Console** nach `/fireadmin`:
+   - Siehst du ROTE Meldungen "ADMIN UI COMMAND EMPFANGEN"?
+   - Siehst du "Thread gestartet..."?
+   - Siehst du "SetNuiFocus aufgerufen!"?
+
+3. **Im Spiel - Bildschirm** nach `/fireadmin`:
+   - Erscheint für 5 Sekunden TEXT in der Mitte: "FIRE ADMIN TEST..."?
+   - Wenn JA: Client-Code funktioniert
+   - Wenn NEIN: Command kommt nicht an
+
+4. **Browser Console** (F12 in FiveM):
+   - Gibt es JavaScript Fehler?
+   - Siehst du "[FIRE-ADMIN] HTML LOADED!"?
+
+Sag mir was du von diesen Punkten siehst!

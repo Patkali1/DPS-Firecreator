@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: transparent;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        body.show-ui {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        #adminPanel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(40, 40, 40, 0.95) 100%);
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(255, 68, 0, 0.3);
+            border: 2px solid rgba(255, 68, 0, 0.5);
+            overflow: hidden;
+        }
+
+        #adminPanel.visible {
+            display: block;
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, #ff4400 0%, #cc3300 100%);
+            padding: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .panel-content {
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            color: #ff4400;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 68, 0, 0.3);
+        }
+
+        .fire-locations {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .location-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .location-info {
+            color: white;
+            flex: 1;
+        }
+
+        .location-coords {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 5px;
+        }
+
+        .location-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-test {
+            background: #ff4400;
+            color: white;
+        }
+
+        .btn-test:hover {
+            background: #ff6622;
+            transform: translateY(-2px);
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .btn-tp {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-tp:hover {
+            background: #0056b3;
+        }
+
+        .add-location-section {
+            background: rgba(255, 68, 0, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 68, 0, 0.3);
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+            color: white;
+            font-size: 16px;
+        }
+
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .settings-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+        }
+
+        .setting-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #ff4400;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 68, 0, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 68, 0, 0.7);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-save-settings {
+            grid-column: 1 / -1;
+            padding: 12px;
+            background: #ff4400;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-save-settings:hover {
+            background: #ff6622;
+        }
+    </style>
+</head>
+<body>
+    <div id="adminPanel">
+        <div class="panel-header">
+            <h1>🔥 Fire Admin Panel</h1>
+            <button class="close-btn" onclick="closePanel()">×</button>
+        </div>
+        
+        <div class="panel-content">
+            <!-- Fire Locations -->
+            <div class="section">
+                <div class="section-title">Feuer-Spawn-Punkte</div>
+                <div class="fire-locations" id="locationsList">
+                    <!-- Dynamically filled -->
+                </div>
+            </div>
+
+            <!-- Add Location -->
+            <div class="section">
+                <div class="add-location-section">
+                    <button class="btn btn-add" onclick="addCurrentLocation()">
+                        ➕ Aktuelle Position als Spawn-Punkt hinzufügen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="section">
+                <div class="section-title">Feuer-Einstellungen</div>
+                <div class="settings-section">
+                    <div class="setting-item">
+                        <label class="setting-label">Max. Feuer gleichzeitig</label>
+                        <input type="number" class="setting-input" id="maxFires" min="1" max="20" value="5">
+                    </div>
+                    <div class="setting-item">
+                        <label class="setting-label">Spawn-Intervall (Minuten)</label>
+                        <input type="number" class="setting-input" id="spawnInterval" min="1" max="60" value="10">
+                    </div>
+                    <div class="setting-item">
+                        <label class="setting-label">Ausbreitungs-Intervall (Sekunden)</label>
+                        <input type="number" class="setting-input" id="spreadInterval" min="10" max="120" value="30">
+                    </div>
+                    <div class="setting-item">
+                        <label class="setting-label">Windstärke (0.5 - 2.0)</label>
+                        <input type="number" class="setting-input" id="windStrength" min="0.5" max="2.0" step="0.1" value="1.0">
+                    </div>
+                    <button class="btn btn-save-settings" onclick="saveSettings()">
+                        💾 Einstellungen speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('[FIRE-ADMIN] Script lädt...');
+        let locations = [];
+        const resourceName = 'DPS-Fire';
+
+        // Zeige Panel sofort beim Laden
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[FIRE-ADMIN] DOM Ready!');
+            // Panel ist bereits durch CSS sichtbar
+        });
+
+        window.addEventListener('message', function(event) {
+            const data = event.data;
+            
+            console.log('[FIRE-ADMIN] Message empfangen:', data);
+            
+            if (data.action === 'open') {
+                console.log('[FIRE-ADMIN] Opening panel with', data.locations ? data.locations.length : 0, 'locations');
+                openPanel(data.locations, data.settings);
+            } else if (data.action === 'close') {
+                console.log('[FIRE-ADMIN] Close action received');
+                const panel = document.getElementById('adminPanel');
+                const body = document.body;
+                panel.classList.remove('visible');
+                body.classList.remove('show-ui');
+            }
+        });
+
+        function openPanel(locs, settings) {
+            console.log('[FIRE-ADMIN] openPanel aufgerufen');
+            locations = locs || [];
+            
+            const panel = document.getElementById('adminPanel');
+            const body = document.body;
+            
+            panel.classList.add('visible');
+            body.classList.add('show-ui');
+            
+            console.log('[FIRE-ADMIN] Panel sichtbar gemacht');
+            renderLocations();
+            
+            if (settings) {
+                console.log('[FIRE-ADMIN] Settings laden...');
+                document.getElementById('maxFires').value = settings.maxFires;
+                document.getElementById('spawnInterval').value = settings.spawnInterval;
+                document.getElementById('spreadInterval').value = settings.spreadInterval;
+                document.getElementById('windStrength').value = settings.windStrength;
+            }
+            console.log('[FIRE-ADMIN] Panel sollte jetzt sichtbar sein!');
+        }
+
+        function closePanel() {
+            console.log('[FIRE-ADMIN] Closing panel...');
+            
+            const panel = document.getElementById('adminPanel');
+            const body = document.body;
+            
+            panel.classList.remove('visible');
+            body.classList.remove('show-ui');
+            
+            fetch(`https://${resourceName}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(() => {
+                console.log('[FIRE-ADMIN] Close request sent');
+            }).catch(err => {
+                console.error('[FIRE-ADMIN] Close request failed:', err);
+            });
+        }
+
+        function renderLocations() {
+            const list = document.getElementById('locationsList');
+            
+            if (locations.length === 0) {
+                list.innerHTML = '<div class="empty-state">Keine Spawn-Punkte konfiguriert</div>';
+                return;
+            }
+            
+            list.innerHTML = locations.map((loc, index) => `
+                <div class="location-item">
+                    <div class="location-info">
+                        <div>Spawn-Punkt #${index + 1}</div>
+                        <div class="location-coords">X: ${loc.x.toFixed(2)} | Y: ${loc.y.toFixed(2)} | Z: ${loc.z.toFixed(2)}</div>
+                    </div>
+                    <div class="location-actions">
+                        <button class="btn btn-test" onclick="testFire(${index})">🔥 Test</button>
+                        <button class="btn btn-tp" onclick="teleportTo(${index})">📍 TP</button>
+                        <button class="btn btn-delete" onclick="deleteLocation(${index})">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addCurrentLocation() {
+            fetch(`https://${resourceName}/addLocation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        }
+
+        function testFire(index) {
+            fetch(`https://${resourceName}/testFire`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: index })
+            });
+        }
+
+        function teleportTo(index) {
+            fetch(`https://${resourceName}/teleportTo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: index })
+            });
+        }
+
+        function deleteLocation(index) {
+            fetch(`https://${resourceName}/deleteLocation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: index })
+            });
+        }
+
+        function saveSettings() {
+            const settings = {
+                maxFires: parseInt(document.getElementById('maxFires').value),
+                spawnInterval: parseInt(document.getElementById('spawnInterval').value),
+                spreadInterval: parseInt(document.getElementById('spreadInterval').value),
+                windStrength: parseFloat(document.getElementById('windStrength').value)
+            };
+            
+            fetch(`https://${resourceName}/saveSettings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closePanel();
+            }
+        });
+    </script>
+</body>
+</html>
